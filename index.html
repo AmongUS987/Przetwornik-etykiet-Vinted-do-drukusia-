@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Przetwornik Etykiet PDF → JPG</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --border: #30363d;
+    --accent: #e94560;
+    --accent2: #533483;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --ok: #3fb950;
+    --warn: #d29922;
+    --err: #f85149;
+    --white: #ffffff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100%;
+    overflow: hidden;
+  }
+  header {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-shrink: 0;
+  }
+  header h1 { font-size: 1.05rem; color: var(--accent); font-weight: 600; }
+  .header-actions { display: flex; gap: 8px; }
+  .btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity .15s;
+    touch-action: manipulation;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .btn:active { opacity: .8; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn.secondary {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .btn.secondary:active { background: var(--border); }
+  .btn.small { padding: 8px 12px; font-size: 0.85rem; min-height: 36px; }
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  .panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 12px;
+    overflow: hidden;
+    min-width: 0;
+  }
+  .panel-left { border-right: 1px solid var(--border); }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .card-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  select {
+    width: 100%;
+    background: var(--bg);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b949e' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+  }
+  .drop-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 24px 16px;
+    text-align: center;
+    color: var(--muted);
+    transition: all .2s;
+    margin-bottom: 12px;
+    background: var(--panel);
+  }
+  .drop-zone.dragover {
+    border-color: var(--accent);
+    background: rgba(233,69,96,0.08);
+    color: var(--text);
+  }
+  .drop-zone .big-icon { font-size: 2rem; margin-bottom: 6px; display: block; }
+  .status {
+    font-size: 0.85rem;
+    padding: 8px 12px;
+    border-radius: 8px;
+    background: var(--bg);
+    margin-bottom: 12px;
+    min-height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .status.ok { color: var(--ok); }
+  .status.warn { color: var(--warn); }
+  .status.err { color: var(--err); }
+  .canvas-wrapper {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    position: relative;
+    overflow: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 180px;
+  }
+  canvas { display: block; max-width: 100%; max-height: 100%; }
+  .target-wrap {
+    width: 100%;
+    max-width: 1000px;
+    aspect-ratio: 4 / 1;
+    margin: 0 auto;
+    border: 2px solid var(--accent);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--white);
+    position: relative;
+  }
+  .target-wrap canvas { width: 100%; height: 100%; }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .badge.orlen { background: #e94560; color: #fff; }
+  .badge.dhl { background: #ffcc00; color: #000; }
+  .badge.dpd { background: #e31e24; color: #fff; }
+  .badge.custom { background: var(--accent2); color: #fff; }
+  .hidden { display: none !important; }
+  @media (max-width: 768px) {
+    header h1 { font-size: 0.95rem; }
+    .main { flex-direction: column; overflow-y: auto; }
+    .panel { padding: 10px; }
+    .panel-left { border-right: none; border-bottom: 1px solid var(--border); }
+    .target-wrap { max-width: 100%; }
+    .btn { font-size: 0.9rem; padding: 10px 14px; }
+    .card { padding: 12px; }
+  }
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+</script>
+</head>
+<body style="display:flex; flex-direction:column; height:100vh;">
+
+<header>
+  <h1>📄 Przetwornik Etykiet</h1>
+  <div class="header-actions">
+    <button class="btn secondary small" onclick="resetApp()">🗑 Reset</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="panel panel-left">
+    <div class="card">
+      <div class="card-title">
+        🚚 Przewoźnik
+        <span id="carrierBadge" class="badge orlen">Orlen Paczka</span>
+      </div>
+      <select id="carrierSelect" onchange="onCarrierChange()">
+        <option value="orlen">Orlen Paczka</option>
+        <option value="dhl">DHL</option>
+        <option value="dpd">DPD</option>
+        <option value="custom">Własny schemat (JSON)</option>
+      </select>
+      <div style="margin-top:10px;" id="customUploadWrap" class="hidden">
+        <button class="btn secondary small" style="width:100%;" onclick="document.getElementById('customSchemaInput').click()">
+          📋 Wczytaj plik JSON
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">📂 Plik PDF</div>
+      <div class="drop-zone" id="dropZone"
+           ondragover="dragOver(event)" ondragleave="dragLeave(event)" ondrop="dropPDF(event)">
+        <span class="big-icon">📄</span>
+        <div>Dotknij lub przeciągnij PDF</div>
+        <small style="color:var(--muted);">Strona 1 zostanie przetworzona</small>
+      </div>
+      <input type="file" id="customSchemaInput" accept=".json,application/json" class="hidden" onchange="loadCustomSchema(event)">
+      <input type="file" id="pdfInput" accept=".pdf,application/pdf" class="hidden" onchange="loadPDF(event)">
+      <button class="btn secondary small" style="width:100%; margin-top:4px;" onclick="document.getElementById('pdfInput').click()">
+        📁 Wybierz z dysku
+      </button>
+    </div>
+
+    <div class="status" id="status">Wybierz przewoźnika i wrzuć PDF.</div>
+
+    <div class="canvas-wrapper">
+      <canvas id="sourceCanvas"></canvas>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="card" style="flex:1; display:flex; flex-direction:column;">
+      <div class="card-title" style="justify-content:space-between;">
+        <span>🎯 Gotowa etykieta</span>
+        <span style="font-size:0.75rem; color:var(--muted);">1000 × 250 px</span>
+      </div>
+      <div class="target-wrap">
+        <canvas id="targetCanvas" width="1000" height="250"></canvas>
+      </div>
+      <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn" id="btnProcess" onclick="processLabel()" disabled style="flex:1; min-width:140px;">
+          ⚙ Przetwórz
+        </button>
+        <button class="btn secondary" id="btnDownload" onclick="downloadJPG()" disabled style="flex:1; min-width:140px;">
+          💾 Pobierz JPG
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const BUILTIN_SCHEMAS = {
+  orlen: {
+    "source": { "width": 1754, "height": 1241, "filename": "source.jpg" },
+    "target": { "width": 1000, "height": 250, "format": "jpg", "quality": 0.95 },
+    "blocks": [
+      { "id": 1, "source": { "x": 458, "y": 12, "w": 115, "h": 566 }, "target": { "x": 225, "y": -226 }, "rotation": -90, "scale": 1, "zIndex": 0 },
+      { "id": 2, "source": { "x": 678, "y": 13, "w": 137, "h": 565 }, "target": { "x": 214, "y": -105 }, "rotation": 270, "scale": 1, "zIndex": 1 },
+      { "id": 3, "source": { "x": 586, "y": 147, "w": 78, "h": 306 }, "target": { "x": 703, "y": 37 }, "rotation": -90, "scale": 1.089, "zIndex": 2 },
+      { "id": 6, "source": { "x": 398, "y": 13, "w": 57, "h": 285 }, "target": { "x": 656, "y": -91 }, "rotation": -90, "scale": 0.81, "zIndex": 3 },
+      { "id": 7, "source": { "x": 314, "y": 14, "w": 57, "h": 284 }, "target": { "x": 657, "y": -45 }, "rotation": -90, "scale": 0.81, "zIndex": 4 },
+      { "id": 8, "source": { "x": 285, "y": 468, "w": 75, "h": 74 }, "target": { "x": 780, "y": -1 }, "rotation": -90, "scale": 1.949, "zIndex": 5 }
+    ]
+  },
+  dhl: null,
+  dpd: {"source": {"width": 1240, "height": 1755, "filename": "source.jpg"}, "target": {"width": 1000, "height": 250, "format": "jpg", "quality": 0.95}, "blocks": [{"id": 9, "source": {"x": 39, "y": 93, "w": 358, "h": 274}, "target": {"x": -1, "y": -3}, "rotation": 0, "scale": 0.585, "zIndex": 0}, {"id": 13, "source": {"x": 500, "y": 98, "w": 103, "h": 177}, "target": {"x": 33, "y": 115}, "rotation": -90, "scale": 0.9, "zIndex": 1}, {"id": 14, "source": {"x": 397, "y": 98, "w": 89, "h": 177}, "target": {"x": 200, "y": 110}, "rotation": -90, "scale": 1, "zIndex": 2}, {"id": 15, "source": {"x": 398, "y": 287, "w": 206, "h": 209}, "target": {"x": 211, "y": 1}, "rotation": 0, "scale": 0.802, "zIndex": 3}, {"id": 16, "source": {"x": 43, "y": 509, "w": 561, "h": 358}, "target": {"x": 384, "y": 5}, "rotation": 0, "scale": 0.656, "zIndex": 5}]}
+};
+
+const app = {
+  carrier: 'orlen',
+  schema: null,
+  pdfData: null,
+  sourceImage: null,
+  rendered: false
+};
+
+const statusEl = document.getElementById('status');
+const btnProcess = document.getElementById('btnProcess');
+const btnDownload = document.getElementById('btnDownload');
+const sourceCanvas = document.getElementById('sourceCanvas');
+const targetCanvas = document.getElementById('targetCanvas');
+const sCtx = sourceCanvas.getContext('2d');
+const tCtx = targetCanvas.getContext('2d');
+
+function setStatus(msg, type='') {
+  statusEl.textContent = msg;
+  statusEl.className = 'status ' + type;
+}
+
+function onCarrierChange() {
+  const sel = document.getElementById('carrierSelect');
+  app.carrier = sel.value;
+  const badge = document.getElementById('carrierBadge');
+  const customWrap = document.getElementById('customUploadWrap');
+
+  badge.className = 'badge';
+  badge.classList.remove('hidden');
+  customWrap.classList.add('hidden');
+
+  if (app.carrier === 'orlen') {
+    badge.classList.add('orlen');
+    badge.textContent = 'Orlen Paczka';
+    app.schema = BUILTIN_SCHEMAS.orlen;
+    setStatus('✅ Wbudowany schemat: Orlen Paczka (' + app.schema.blocks.length + ' bloków)', 'ok');
+  } else if (app.carrier === 'dhl') {
+    badge.classList.add('dhl');
+    badge.textContent = 'DHL';
+    app.schema = BUILTIN_SCHEMAS.dhl;
+    setStatus('ℹ️ DHL: schemat niedostępny. Wybierz „Własny schemat” lub dodaj go później.', 'warn');
+  } else if (app.carrier === 'dpd') {
+    badge.classList.add('dpd');
+    badge.textContent = 'DPD';
+    app.schema = BUILTIN_SCHEMAS.dpd;
+    setStatus('✅ Wbudowany schemat: DPD (' + app.schema.blocks.length + ' bloków)', 'ok');
+  } else {
+    badge.classList.add('custom');
+    badge.textContent = 'Własny';
+    customWrap.classList.remove('hidden');
+    app.schema = null;
+    setStatus('Wczytaj własny plik JSON ze schematem.');
+  }
+  checkReady();
+}
+
+function loadCustomSchema(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      app.schema = JSON.parse(ev.target.result);
+      setStatus('✅ Wczytano własny schemat: ' + app.schema.blocks.length + ' bloków', 'ok');
+      checkReady();
+    } catch (err) {
+      setStatus('❌ Błąd JSON: ' + err.message, 'err');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function dragOver(e) { e.preventDefault(); document.getElementById('dropZone').classList.add('dragover'); }
+function dragLeave(e) { e.preventDefault(); document.getElementById('dropZone').classList.remove('dragover'); }
+function dropPDF(e) {
+  e.preventDefault();
+  document.getElementById('dropZone').classList.remove('dragover');
+  const files = e.dataTransfer.files;
+  if (files.length) handlePDFFile(files[0]);
+}
+function loadPDF(e) {
+  const file = e.target.files[0];
+  if (file) handlePDFFile(file);
+}
+
+function handlePDFFile(file) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    app.pdfData = new Uint8Array(ev.target.result);
+    setStatus('✅ PDF wczytany: ' + file.name, 'ok');
+    checkReady();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function checkReady() {
+  const ready = !!(app.schema && app.pdfData);
+  btnProcess.disabled = !ready;
+  if (ready) setStatus('✅ Gotowe! Kliknij „Przetwórz”.', 'ok');
+}
+
+async function processLabel() {
+  if (!app.schema || !app.pdfData) return;
+  btnProcess.disabled = true;
+  setStatus('⏳ Renderowanie PDF...');
+
+  try {
+    const pdf = await pdfjsLib.getDocument({data: app.pdfData}).promise;
+    const page = await pdf.getPage(1);
+
+    const desiredWidth = app.schema.source.width;
+    const viewport = page.getViewport({scale: 1});
+    const scale = desiredWidth / viewport.width;
+    const scaledViewport = page.getViewport({scale: scale});
+
+    sourceCanvas.width = scaledViewport.width;
+    sourceCanvas.height = scaledViewport.height;
+
+    await page.render({ canvasContext: sCtx, viewport: scaledViewport }).promise;
+
+    app.sourceImage = new Image();
+    app.sourceImage.src = sourceCanvas.toDataURL('image/jpeg', 0.95);
+    await new Promise(r => app.sourceImage.onload = r);
+
+    sCtx.strokeStyle = 'rgba(0,255,0,0.7)';
+    sCtx.lineWidth = 2;
+    app.schema.blocks.forEach(b => {
+      sCtx.strokeRect(b.source.x, b.source.y, b.source.w, b.source.h);
+    });
+
+    setStatus('⏳ Składanie etykiety...');
+
+    tCtx.clearRect(0,0,1000,250);
+    tCtx.fillStyle = '#ffffff';
+    tCtx.fillRect(0,0,1000,250);
+
+    const sorted = [...app.schema.blocks].sort((a,b) => a.zIndex - b.zIndex);
+    sorted.forEach(b => {
+      const sf = b.scale || 1;
+      const dw = b.source.w * sf;
+      const dh = b.source.h * sf;
+      tCtx.save();
+      tCtx.translate(b.target.x + dw/2, b.target.y + dh/2);
+      tCtx.rotate((b.rotation || 0) * Math.PI / 180);
+      tCtx.drawImage(app.sourceImage, b.source.x, b.source.y, b.source.w, b.source.h, -dw/2, -dh/2, dw, dh);
+      tCtx.restore();
+    });
+
+    app.rendered = true;
+    btnDownload.disabled = false;
+    setStatus('✅ Gotowe! Kliknij „Pobierz JPG”.', 'ok');
+  } catch (err) {
+    console.error(err);
+    setStatus('❌ Błąd: ' + err.message, 'err');
+    btnProcess.disabled = false;
+  }
+}
+
+function downloadJPG() {
+  if (!app.rendered) return;
+  const link = document.createElement('a');
+  link.download = 'etykieta_' + app.carrier + '.jpg';
+  link.href = targetCanvas.toDataURL('image/jpeg', 0.95);
+  link.click();
+}
+
+function resetApp() {
+  app.schema = null;
+  app.pdfData = null;
+  app.sourceImage = null;
+  app.rendered = false;
+  btnProcess.disabled = true;
+  btnDownload.disabled = true;
+  document.getElementById('carrierSelect').value = 'orlen';
+  onCarrierChange();
+  sCtx.clearRect(0,0,sourceCanvas.width,sourceCanvas.height);
+  tCtx.clearRect(0,0,1000,250);
+  tCtx.fillStyle = '#ffffff';
+  tCtx.fillRect(0,0,1000,250);
+  document.getElementById('customSchemaInput').value = '';
+  document.getElementById('pdfInput').value = '';
+}
+
+tCtx.fillStyle = '#ffffff';
+tCtx.fillRect(0,0,1000,250);
+onCarrierChange();
+</script>
+</body>
+</html>
